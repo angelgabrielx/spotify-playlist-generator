@@ -4,7 +4,10 @@ import streamlit as st
 import urllib.parse
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from langdetect import detect, DetectorFactory
+try:
+    from langdetect import detect, DetectorFactory
+except ImportError:
+    st.error("The language library is still installing. Please refresh in 1 minute!")
 
 DetectorFactory.seed = 0
 
