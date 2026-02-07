@@ -4,7 +4,7 @@ import streamlit as st
 import urllib.parse
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from langdetect import detect, DetectorFactory
+from langdetect import detect, detect_langs, DetectorFactory
 
 DetectorFactory.seed = 0
 
@@ -95,6 +95,7 @@ def load_data():
 def get_global_recommendations(user_query, df, lang_code):
     tfidf = TfidfVectorizer(stop_words='english')
     
+    # Pre-shuffle for variety
     df = df.sample(frac=1).reset_index(drop=True)
     
     temp_df = pd.concat([df['metadata'], pd.Series([user_query])], ignore_index=True)
@@ -104,7 +105,8 @@ def get_global_recommendations(user_query, df, lang_code):
     selected_indices = []
     artist_counts = {}
     
-    potential_indices = sim_scores.argsort()[-5000:][::-1]
+    # Increase search pool to 8000 to find enough matches in specific languages
+    potential_indices = sim_scores.argsort()[-8000:][::-1]
     
     for idx in potential_indices:
         if len(selected_indices) >= 30:
@@ -112,21 +114,30 @@ def get_global_recommendations(user_query, df, lang_code):
             
         song_name = df.iloc[idx]['track_name']
         current_artist = df.iloc[idx]['artists']
+        current_genre = str(df.iloc[idx]['track_genre']).lower()
 
         if lang_code != "any":
             try:
-                if detect(song_name) != lang_code:
-                    continue
+                predictions = detect_langs(song_name)
+                top_prediction = predictions[0]
+                
+                if top_prediction.lang != lang_code:
+                    lang_name_map = {"ta": "tamil", "fr": "french", "es": "spanish", "ja": "japanese"}
+                    target_word = lang_name_map.get(lang_code, "impossible_string")
+                    
+                    if target_word not in current_genre:
+                        continue
             except:
                 continue 
         
+        # --- DIVERSITY CHECK ---
         count = artist_counts.get(current_artist, 0)
         if count >= 3: 
             continue
-    
+        
         selected_indices.append(idx)
         artist_counts[current_artist] = count + 1
-
+    
     random.shuffle(selected_indices)
     return df.iloc[selected_indices]
 
